@@ -54,6 +54,9 @@ Alle Dateien liegen in `c:\GitRepos\Raspy46\netwatch\` (nur Python-Standardbibli
 2. **Anomalieerkennung** (`AnomalyMonitor`): Auslöser sind
    - `rogue-server`: DHCP-Antwort (Offer/ACK/NAK) von nicht erlaubter Absender-IP
      (erlaubt = Gateway aus der Default-Route, oder `--dhcp-server`)
+   - `rogue-server-selected`: Client-Request (Broadcast) nennt per Option 54 einen nicht
+     erlaubten Server; erkennt Rogue-Server auch dann, wenn deren Unicast-Antwort den
+     Raspi nie erreicht
    - `multiple-servers`: mehrere Absender-IPs auf dieselbe Transaktion (xid)
    - `no-offer`: Discover ohne Offer (standardmäßig aus, `--no-offer-timeout`)
 3. **Vorfall sichern**: Ringpuffer wird nach `/var/log/dhcp/incidents/<Zeit>_<Grund>/at-trigger/`
@@ -125,15 +128,27 @@ nicht, `no-offer` ist deshalb standardmäßig aus.
   Daten vom Raspi ankommen; mit `homeassistant/#` die Discovery-Konfigurationen.
 - Birth/Will in den HA-MQTT-Optionen betreffen nur HA selbst, am Raspi nichts ändern.
 - `sudo`/`ssh -t` ist nötig, damit Passwortabfragen (sudo, MQTT) funktionieren.
+- **InfluxDB-Sensoren „Nicht verfügbar“** nach HA-IP-Wechsel (`.125` → `.18`): Die REST-
+  Sensoren im Repo `hajr` hatten die alte IP fest eingetragen (angepasst). Nach einer
+  IP-Änderung im Repo nach der alten Adresse suchen, synchronisieren, REST neu laden.
+- **iPhone bekam 192.168.68.53/22 (Router 192.168.68.1)**, der Raspi bemerkte nichts:
+  Ursache ist der **TP-Link Deco im Router-Modus** (eigener DHCP, eigenes Subnetz hinter
+  der Fritz!Box, doppelte NAT). Dessen DHCP läuft nur im WLAN und erreicht `eth0` des
+  Raspi nicht. Lösung: Deco auf **Access-Point-Modus** stellen, die Fritz!Box bleibt
+  einziger Router/DHCP. Danach sieht der Raspi die DHCP-Anfragen aller WLAN-Geräte.
+  Ein Mesh braucht keinen eigenen DHCP-Server, der ist nur beim Deco als einzigem Router
+  sinnvoll.
 
 ## Offene Schritte
 
-1. Erkennung mit künstlichem Vorfall testen (zweite Instanz mit falschem
+1. **Deco auf Access-Point-Modus umstellen** (Deco-App → Mehr → Erweitert → Betriebsmodus),
+   danach prüfen, dass WLAN-Geräte `192.168.2.x` bekommen.
+2. Neue Version (`rogue-server-selected`) auf dem Raspi einspielen:
+   `python deploy_netwatch.py 192.168.2.19 --run --mqtt-host 192.168.2.18 --mqtt-user netwatch`
+3. Erkennung mit künstlichem Vorfall testen (zweite Instanz mit falschem
    `--allowed-server`, dann `ipconfig /release` + `/renew` am PC; Dienst vorher
    stoppen, wenn auch die Dashboard-Anzeige getestet werden soll).
-2. Optional: Fritz!Box-Ereignislog aktivieren (System → Ereignisse, alle Kategorien).
-3. Optional: Alter Ordner/Kopie `c:\GitRepos\Raspy46\setup_netwatch.py` im Hauptordner
-   löschen (veraltet, nur `netwatch\` ist maßgeblich).
+4. Optional: Fritz!Box-Ereignislog aktivieren (System → Ereignisse, alle Kategorien).
 
 ## Analyse beim nächsten Vorfall
 

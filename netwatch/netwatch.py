@@ -160,6 +160,7 @@ class AnomalyMonitor:
 
     Erkannt werden:
       rogue-server     DHCP-Antwort (Offer/ACK/NAK) von einer nicht erlaubten Absender-IP
+      rogue-server-selected  Client-Request nennt einen nicht erlaubten Server (Option 54)
       multiple-servers verschiedene Absender-IPs antworten auf dieselbe Transaktion (xid)
       no-offer         Discover ohne Offer innerhalb des Timeouts (optional)
 
@@ -190,6 +191,13 @@ class AnomalyMonitor:
             return
         if pkt["op"] == 1 and pkt["msg_type"] == 1 and self.no_offer_timeout:
             self.discovers[pkt["xid"]] = (now, pkt["client_mac"])
+        if (pkt["op"] == 1 and pkt["msg_type"] == 3 and pkt["server_id"]
+                and self.allowed and pkt["server_id"] not in self.allowed):
+            # Die Request nennt den gewählten Server; sie ist ein Broadcast und auch dann sichtbar,
+            # wenn die Antwort des fremden Servers den Raspi nie erreicht.
+            self.trigger("rogue-server-selected",
+                         f"Client {pkt['client_mac']} wählt nicht erlaubten DHCP-Server {pkt['server_id']}, "
+                         f"xid {pkt['xid']:#x}", now)
         if pkt["op"] != 2 or pkt["msg_type"] not in (2, 5, 6):  # Offer, ACK, NAK
             return
         if pkt["msg_type"] == 2:
